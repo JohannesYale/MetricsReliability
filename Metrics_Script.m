@@ -27,86 +27,103 @@ results = struct2table(results);
 m = 0;
 %% Iterate through dataset files
 for n = 1:height(results)
-%% Import data
-casen = cases(n-floor((m+1)/2));
-data = importfile(strcat("LandMarkReviewer2/",casen));
-    if(height(data) <= 23)
-        %% Get Points (x,y,y)
-        tibLatPostCon =  table2array(data(16,10:12));       %tibia lateral posterior condyle
-        tibMedPostCon = table2array(data(17,10:12)) ;       %tibia medial  posterior condyle
-        tibMedIterCondTub = table2array(data(15,10:12));    %tibia lateral intercondylar tubercle
-        tibLatIterCondTub = table2array(data(14,10:12));    %tibia medial  intercondylar tubercle
-        tibTuber = table2array(data(20,10:12));             %tibial tuberosity
-        tibShaftCen =  table2array(data(18,10:12));         %tibial shaft center
-        femPostCondLat = table2array(data(4,10:12));        %femoral lateral posterior condyle
-        femPostCondMed = table2array(data(5,10:12));        %femoral medial  posterior condyle
-        patLatBod = table2array(data(8,10:12));             %patella lateral border
-        patMedBod = table2array(data(9,10:12));            %patella medial  border
-        troch = table2array(data(21,10:12));                %trochlea groove
-        plateau = table2array(data(19,10:12));              %tibial plateau
-        patDistPol = table2array(data(10,10:12));           %patella distal   pole
-        patProxPol = table2array(data(11,10:12));           %patella proximal pole
-        results.Cases(n) = casen; %assign case number
-    end
+ %% Import data
+    casen = cases(n);
+    data = importfile(strcat("(DatsetFolder)/",casen));
     
-    %% Calculate common vectors
-    % Get line tib shaftcenter to intercondylar midpoint
-    tibMidPla = (tibMedIterCondTub + tibLatIterCondTub)/2;
-    tibShaftMid = tibMidPla - tibShaftCen; %Tibial longitudinal axis
-    tibShaftNorm = tibShaftMid/norm(tibShaftMid)^2;
-    % Get posterior  femur and tibial condyle lines
-    femPostCondLine = femPostCondLat -femPostCondMed;
-    femCondLineProj = femPostCondLine - dot(femPostCondLine,tibShaftNorm)*tibShaftNorm; 
-    femCondLineProjNorm  = femCondLineProj/norm(femCondLineProj); %Projected femoral condyle line normalized
-    tibPostCondLine = tibLatPostCon - tibMedPostCon;
-    tibCondLineProj = tibPostCondLine - dot(tibPostCondLine,tibShaftNorm)*tibShaftNorm; 
-    tibCondLineProjNorm =  tibCondLineProj/norm(tibCondLineProj); %Projected tibial condyle line normalized
-    % Patella line through medial and posterior poles
-    patPoleLine = patMedBod - patLatBod;
-    %Tuberosity to tibial plateau eminence
-    tttp =  tibMidPla - tibTuber;
-    %Trochlea groove to tibial plateau eminence
-    tgtp =  troch - tibMidPla;
-    %Trochlea groove to tibial tuberosity
-    tttg = tibTuber - troch;
-    
-    %% Calculate Tibiofemoral rotation
-    rotVector = cross(femCondLineProj,tibCondLineProj); %Assume knee is generally superior inferior aligned (third component pointing up and down)
-    results.ROTTF(n) = signedAngleTwo3DVectors(femCondLineProj,tibCondLineProj,rotVector(:) .* sign(rotVector(3)).* sign(femCondLineProj(1)),1)*180 / pi;
+    %% Get Points (x,y,y)
+    femPostCondLat = table2array(data(5,10:12));        %Femoral lateral posterior condyle
+    femPostCondMed = table2array(data(6,10:12));        %Femoral medial posterior condyle    
+    epicondyleMed = table2array(data(3,10:12));         %Femoral medial epicondyle
+    epicondyleLat = table2array(data(4,10:12));         %Femoral lateral epicondyle
+    troch = table2array(data(22,10:12));                %Femoral trochlea groove
 
-    %% 3D TT-TG
-    results.TTTG3D(n) = dot(femCondLineProjNorm, tttg);
+    tibLatPostCon =  table2array(data(17,10:12));       %Tibia lateral posterior condyle
+    tibMedPostCon = table2array(data(18,10:12)) ;       %Tibia medial posterior condyle
+    tibMedIterCondTub = table2array(data(16,10:12));    %Tibia medial intracondylar tubercle
+    tibLatIterCondTub = table2array(data(15,10:12));    %Tibia lateral intracondylar tubercle
+    tibTuber = table2array(data(21,10:12));             %Tibial tuberosity
+    tibShaftCen =  table2array(data(19,10:12));         %Tibial shaft center    
+    tibBorLat = table2array(data(13,10:12));            %Tibial lateral border
+    tibBorMed = table2array(data(14,10:12));            %Tibial medial border
+
+    patLatBod = table2array(data(9,10:12));             %Patella lateral border
+    patMedBod = table2array(data(10,10:12));            %Patella medial border
+    plateau = table2array(data(20,10:12));              %Tibial plateau
+    patDistPol = table2array(data(11,10:12));           %Patella distal pole
+    patProxPol = table2array(data(12,10:12));           %Patella proximal pole    
+
+
+    %% Calculate reference lines
+    % Get line shaftcenter to intercondylar midpoint
+    tibMidPla = (tibMedIterCondTub + tibLatIterCondTub)/2; %Midpoint between tibial intracondylar tubercles
+    tibShaftMid = tibMidPla - tibShaftCen;                 %Tibial long axis (shaft center to midpoint tibial intracondylar tubercles)
+
+    %Get posterior condyle line femur
+    femPostCondLine = femPostCondLat -femPostCondMed;      %Line between femoral posterior condyles
+    femCondLineProj = femPostCondLine - dot(femPostCondLine,tibShaftMid)*tibShaftMid/norm(tibShaftMid)^2; %Femoral condyle line perpendicular to the tibial longitudinal axis
+    femCondLineProjNorm = femCondLineProj / norm(femCondLineProj); %Direction vector of the femoral post condyle line
     
+    %Get posterior condyle line tibia
+    tibPostCondLine = tibLatPostCon - tibMedPostCon;       %Line between tibial posterior condyles
+    tibCondLineProj = tibPostCondLine - dot(tibPostCondLine,tibShaftMid)*tibShaftMid/norm(tibShaftMid)^2;% Tibial condyle Line perpendicular to the tibial longitudinal axis
+    tibCondLineProjNorm = tibCondLineProj / norm(tibCondLineProj); %Direction of tibial post condyle line
+    
+    %% Tibiofemoral rotation in degree
+    rottf= signedAngleTwo3DVectors(femCondLineProj,tibCondLineProj,tibShaftMid,1);%Angle between posterior condyle lines, along tibial long axis
+    results.ROTTF(n) = rottf*sign(femCondLineProjNorm(1))*180 / pi;               %conversion to degree and sign for external and interal rotation (left/right knee)
+    
+    %% 3D TT-TG 
+    tttg = tibTuber - troch;   %Line between trochlea groove and tibial tuberosity
+    results.TTTG3D(n) = dot(femCondLineProjNorm, tttg)/norm(femCondLineProjNorm); %Projection on the posterior condyle line
+   
     %% 2D TT-TG
-    femPostCondLineYX = [femPostCondLine(1), femPostCondLine(2), 0]; %Femur posterior condyle line projected on axial slice
-    XYTTTG = [tibTuber(1) - troch(1),tibTuber(2) - troch(2),0];
-    results.TTTG2D(n) = dot(femPostCondLineYX, XYTTTG)/norm(femPostCondLineYX);
+    femPostCondLineYX = [femPostCondLine(1), femPostCondLine(2), 0]; %Projection of femoral posterior condyle line onto axial plane
+    results.TTTG2D(n) = dot(femPostCondLineYX, tttg)/norm(femPostCondLineYX); %Projection of TT-TG line on axial posterior condyle line (classic 2D TTTG)
     
-    %% Patella tilt
-    femLineXY = -[femPostCondLine(1),femPostCondLine(2)];    %Axial slice projection femoral condyle line
-    patLineXY = [patPoleLine(1),patPoleLine(2)];            %Axial slice projection patella line
-    if(femLineXY(1) < 0) %Left and right knees
-    results.Patellartilt(n) = signedAngleTwo3DVectors([femLineXY,0],[patLineXY,0],[0,0,1],1)*180/pi;
+    %% Patellar tilt
+    patLineXY = patMedBod(1:2) - patLatBod(1:2); %%Get axial projection of the patella line from lateral to medial border
+
+    if(femPostCondLineYX(1) > 0) %% Get angle sign right and claculate angle between axial femoral posterior condyle line and patella line
+        results.Patellartilt(n) = signedAngleTwo3DVectors([-femPostCondLineYX],[patLineXY,0],[0,0,1],1)*180/pi;
     else
-    results.Patellartilt(n) = signedAngleTwo3DVectors([femLineXY,0],[patLineXY,0],[0,0,1],1)*180/pi * -1; 
+        results.Patellartilt(n) = signedAngleTwo3DVectors([-femPostCondLineYX],[patLineXY,0],[0,0,1],1)*180/pi * -1; 
     end
-    
-    %% Tuberosity distance    
-    results.TubDist(n) = abs(dot(tibCondLineProjNorm, tttp)/norm(tibCondLineProjNorm));
-    
-    %% Trochlea groove distance
-    results.TGDist(n) = -dot(femCondLineProjNorm, tgtp)/norm(femCondLineProjNorm);
+    % Signed two angles credits: Seth Wagenman (2024). signedAngleTwoVectors (https://www.mathworks.com/matlabcentral/fileexchange/78300-signedangletwovectors), MATLAB Central File Exchange. Retrieved November 5, 2024. 
 
-    %% Translational TT-TG
-    results.TransTTTG(n) =  results.TGDist(n) + results.TubDist(n);
+    %% Patellar length
+    results.PatLength(n) = norm(patDistPol - patProxPol);
 
-    %% Rotational TT-TG
-    results.RotDist(n) = results.TTTG3D(n) - results.TransTTTG(n) ;
-
-    %% Patella Height
-    results.PatHeight(n) = norm(patDistPol-plateau) / norm(patProxPol - patDistPol);
+    %% Patellar height
+    results.PatHeight(n) = norm(patDistPol-plateau) / results.PatLength(n);  %%Ratio between distance between the tibial plateau and the distal pat pole to patella length
     
+    %% Epricondylar distance
+    epi = epicondyleMed - epicondyleLat; %Line between femoral epicondyles
+    results.FemEpiCond(n) =dot(femCondLineProjNorm, epi); %Length of epicondyle line projected on the posterior condyle line
+
+    %% Tibial plateau width
+    tpw = tibBorLat - tibBorMed; %Line between tibial pleateau borders
+    results.TibPlatWidth(n) = dot(tibCondLineProjNorm, tpw); %Length of tibial border line projected on the posterior condyle line
+
+    %% TT-TIM Tibial tuberosity to tibial intercondyal midpoint
+    %Calcualte mid point per orignal paper figure (midpoint of bounding box tibial lateral and medial borders and tibial posterior condyles plus anterior tibial plateau 
+    tibLatConPl =  tibLatPostCon - plateau;
+    tibplaMidVect = (tibLatConPl - dot(tibCondLineProjNorm,tibLatConPl)*tibCondLineProjNorm)/2;
+    tpwMidVect = dot(tibCondLineProjNorm, tpw)*tibCondLineProjNorm/2;
+    
+    tibLatConLatBor = tibBorLat - tibLatPostCon;
+    tibLatConLatBorProjVec = tibLatConLatBor - dot(tibCondLineProjNorm,tibLatConLatBor)*tibCondLineProjNorm;
+
+    midPointPl = tibBorLat - tibLatConLatBorProjVec + tibplaMidVect - tpwMidVect; %Midpoint plateau
+
+    tttm = tibTuber - midPointPl; %Tibial tuberosity to mid piont tibial plateau
+    results.TTTIM(n) = dot(tibCondLineProjNorm,tttm); %Distance projected onto the tibial posterior condyle line
+    
+    %% TT-TEM Tibial tuberosity to tibial eminence midpoint
+    tttem = tibTuber - tibMidPla; %%Line between TT and tib plateau midpoint
+    results.TTTEM(n) = dot(tibCondLineProjNorm, tttem)/norm(tibCondLineProjNorm); %%Projection on tibial posterior condyle line
+
     %% Sagittal TT-TG
-    sttg = tttg - dot(femCondLineProjNorm, tttg)*femCondLineProjNorm - dot(tttg,tibShaftNorm)*tibShaftNorm;
-    results.sTTTG(n) = norm(sttg)*sign(sttg(2));
+    sttg = tttg - dot(femCondLineProjNorm, tttg)*femCondLineProjNorm; %%Projection on sagittal plane
+    results.sTTTG(n) = norm(sttg(1:2))*sign(sttg(2)); %sign for posterior and anterior to trochlea(+/-)
 end
